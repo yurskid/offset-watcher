@@ -6,20 +6,40 @@ import re
 import requests
 
 # --- WEBHOOKS LOADED FROM GITHUB SECRETS ---
+# Two-secret setup:
+#   WEBHOOK_OFFSETS -> all game alerts (default for every game channel)
+#   WEBHOOK_LOG     -> the scan log / status channel
+# Optional per-game overrides (take priority over WEBHOOK_OFFSETS):
+#   WEBHOOK_FORTNITE, WEBHOOK_RUST, WEBHOOK_FIVEM, WEBHOOK_CS2, WEBHOOK_ROBLOX,
+#   WEBHOOK_ROBRUN, WEBHOOK_RETRAC, WEBHOOK_VALORANT, WEBHOOK_R6
+# WEBHOOK_ANUNCIOS is still accepted as an alias for WEBHOOK_LOG.
+OFFSETS_WEBHOOK = os.environ.get("WEBHOOK_OFFSETS", "").strip()
+LOG_WEBHOOK = (os.environ.get("WEBHOOK_LOG") or os.environ.get("WEBHOOK_ANUNCIOS") or "").strip()
+
+
+def game_webhook(name):
+    return os.environ.get(f"WEBHOOK_{name.upper()}", "").strip() or OFFSETS_WEBHOOK
+
+
 WEBHOOKS = {
-    "announcements": os.environ.get("WEBHOOK_ANUNCIOS", ""),
-    "fortnite": os.environ.get("WEBHOOK_FORTNITE", ""),
-    "rust": os.environ.get("WEBHOOK_RUST", ""),
-    "fivem": os.environ.get("WEBHOOK_FIVEM", ""),
-    "cs2": os.environ.get("WEBHOOK_CS2", ""),
-    "roblox": os.environ.get("WEBHOOK_ROBLOX", ""),
-    "robrun": os.environ.get("WEBHOOK_ROBRUN", ""),
-    "retrac": os.environ.get("WEBHOOK_RETRAC", ""),
-    "valorant": os.environ.get("WEBHOOK_VALORANT", ""),
-    "r6": os.environ.get("WEBHOOK_R6", ""),
+    "announcements": LOG_WEBHOOK,
+    "fortnite": game_webhook("fortnite"),
+    "rust": game_webhook("rust"),
+    "fivem": game_webhook("fivem"),
+    "cs2": game_webhook("cs2"),
+    "roblox": game_webhook("roblox"),
+    "robrun": game_webhook("robrun"),
+    "retrac": game_webhook("retrac"),
+    "valorant": game_webhook("valorant"),
+    "r6": game_webhook("r6"),
+    "wardogs": game_webhook("wardogs"),
+    "apex": game_webhook("apex"),
 }
 
 ANNOUNCEMENTS_WEBHOOK = WEBHOOKS["announcements"]
+
+print(f"[config] offsets webhook: {'set' if OFFSETS_WEBHOOK else 'MISSING'} | "
+      f"log webhook: {'set' if ANNOUNCEMENTS_WEBHOOK else 'MISSING'}")
 
 GAMES = [
     {
@@ -54,7 +74,12 @@ GAMES = [
     }
 ]
 
-OSHE_GAMES = [
+# offsets.oshe.win moved to offsets.kittyhook.vip (identical API).
+# State keys keep the historical "oshe_" prefix so the host switch does not
+# re-post every game that was already notified.
+KITTYHOOK_STATE_PREFIX = "oshe_"
+
+KITTYHOOK_GAMES = [
     # --- 5 shared games ---
     {
         "slug": "fortnite",
@@ -128,6 +153,25 @@ OSHE_GAMES = [
         "hpp_files": ["Offsets.hpp", "offsets.hpp"],
         "color": 0xFF4655,
         "webhook": WEBHOOKS["valorant"]
+    },
+    # --- KittyHook-only games ---
+    {
+        "slug": "wardogs",
+        "alt_slugs": [],
+        "label": "Wardogs",
+        "engine": "Unreal Engine 5.7",
+        "hpp_files": ["offsets.hpp", "Offsets.hpp"],
+        "color": 0x1ABC9C,
+        "webhook": WEBHOOKS["wardogs"]
+    },
+    {
+        "slug": "apex",
+        "alt_slugs": ["apexlegends", "apex-legends"],
+        "label": "Apex Legends",
+        "engine": "Source Engine",
+        "hpp_files": ["offsets.hpp", "Offsets.hpp"],
+        "color": 0xDA292A,
+        "webhook": WEBHOOKS["apex"]
     }
 ]
 
@@ -160,7 +204,7 @@ XEROZIFY_GAMES = [
 
 STATE_FILE = "state.json"
 CHEATOFFSETS_URL = "https://www.cheatoffsets.com/api"
-OSHE_URL = "https://offsets.oshe.win"
+KITTYHOOK_URL = "https://offsets.kittyhook.vip"
 XEROZIFY_URL = "https://xerozify.xyz/api/offsets/games"
 
 
@@ -266,68 +310,73 @@ for game in GAMES:
     except Exception as e:
         print(f"[{slug}] Error: {e}")
 
-# 2. Check all games on offsets.oshe.win
-for game in OSHE_GAMES:
+# 2. Check all games on offsets.kittyhook.vip (formerly offsets.oshe.win)
+for game in KITTYHOOK_GAMES:
     slug = game["slug"]
-    state_key = f"oshe_{slug}"
+    state_key = f"{KITTYHOOK_STATE_PREFIX}{slug}"
     try:
         meta_res = None
         actual_slug = slug
         for candidate in [slug] + game.get("alt_slugs", []):
-            r = requests.get(f"{OSHE_URL}/api/{candidate}/latest", timeout=15)
+            r = requests.get(f"{KITTYHOOK_URL}/api/{candidate}/latest", timeout=20)
             if r.status_code == 200:
                 meta_res = r
                 actual_slug = candidate
                 break
 
         if not meta_res:
-            print(f"[oshe:{slug}] Could not fetch /latest")
+            print(f"[kittyhook:{slug}] Could not fetch /latest")
             continue
 
         meta = meta_res.json()
         build_id = str(meta.get("build") or meta.get("sha256") or meta.get("version"))
 
         if state.get(state_key) != build_id:
-            print(f"[oshe:{slug}] New update detected: Build {build_id}")
+            print(f"[kittyhook:{slug}] New update detected: Build {build_id}")
 
             content_str = None
             filename = None
             mime_type = "text/plain"
-            used_url = f"{OSHE_URL}/games/{actual_slug}/offsets.json"
+            used_url = f"{KITTYHOOK_URL}/games/{actual_slug}/offsets.json"
 
             for hpp_name in game.get("hpp_files", ["offsets.hpp"]):
-                hpp_res = requests.get(f"{OSHE_URL}/games/{actual_slug}/{hpp_name}", timeout=15)
+                hpp_res = requests.get(f"{KITTYHOOK_URL}/games/{actual_slug}/{hpp_name}", timeout=20)
                 if hpp_res.status_code == 200 and hpp_res.text.strip():
                     content_str = hpp_res.text
-                    filename = f"{slug}_oshe_{build_id}.hpp"
-                    used_url = f"{OSHE_URL}/games/{actual_slug}/{hpp_name}"
+                    filename = f"{slug}_kittyhook_{build_id}.hpp"
+                    used_url = f"{KITTYHOOK_URL}/games/{actual_slug}/{hpp_name}"
                     break
 
             if not content_str:
-                json_res = requests.get(f"{OSHE_URL}/games/{actual_slug}/offsets.json", timeout=15)
-                content_str = json_res.text
-                filename = f"{slug}_oshe_{build_id}.json"
-                mime_type = "application/json"
+                json_res = requests.get(f"{KITTYHOOK_URL}/games/{actual_slug}/offsets.json", timeout=20)
+                if json_res.status_code == 200 and json_res.text.strip():
+                    content_str = json_res.text
+                    filename = f"{slug}_kittyhook_{build_id}.json"
+                    mime_type = "application/json"
+
+            if not content_str:
+                print(f"[kittyhook:{slug}] No downloadable file yet, will retry next scan.")
+                continue
 
             embed = {
                 "title": f"{game['label']} offsets updated",
                 "description": f"**Build:** `{build_id}`\n**Engine:** {game['engine']}",
                 "url": used_url,
                 "color": game["color"],
-                "footer": {"text": "offsets.oshe.win"}
+                "footer": {"text": "offsets.kittyhook.vip"}
             }
             payload = {"content": "@Offsets", "embeds": [embed]}
             files = {"file": (filename, content_str, mime_type)}
 
             if game["webhook"]:
-                requests.post(game["webhook"], data={"payload_json": json.dumps(payload)}, files=files, timeout=15)
+                requests.post(game["webhook"], data={"payload_json": json.dumps(payload)}, files=files, timeout=20)
             state[state_key] = build_id
             updated = True
-            updated_summary.append(f"**{game['label']}** (`offsets.oshe.win` · `{build_id}`)")
+            updated_summary.append(f"**{game['label']}** (`offsets.kittyhook.vip` · `{build_id}`)")
         else:
-            print(f"[oshe:{slug}] No changes.")
+            print(f"[kittyhook:{slug}] No changes.")
     except Exception as e:
-        print(f"[oshe:{slug}] Error: {e}")
+        print(f"[kittyhook:{slug}] Error: {e}")
 
 # 3. Check games on xerozify.xyz
 for game in XEROZIFY_GAMES:
@@ -386,7 +435,7 @@ if ANNOUNCEMENTS_WEBHOOK and ANNOUNCEMENTS_WEBHOOK.startswith("http"):
         "title": "📢 Offset Scan Log",
         "description": desc,
         "color": embed_color,
-        "footer": {"text": "24/7 Monitor · 17 sources checked"}
+        "footer": {"text": "24/7 Monitor · 19 sources checked"}
     }
     try:
         r = requests.post(ANNOUNCEMENTS_WEBHOOK, json={"embeds": [summary_embed]}, timeout=15)

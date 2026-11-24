@@ -2,9 +2,16 @@ name: Check Offsets
 
 on:
   workflow_dispatch:
+  schedule:
+    # Every 15 minutes. GitHub may delay scheduled runs under heavy load.
+    - cron: '*/15 * * * *'
 
 permissions:
   contents: write
+
+concurrency:
+  group: offset-watcher
+  cancel-in-progress: false
 
 jobs:
   check:
@@ -24,6 +31,8 @@ jobs:
       - name: Run offset check
         run: python check_offsets.py
         env:
+          WEBHOOK_OFFSETS: ${{ secrets.WEBHOOK_OFFSETS }}
+          WEBHOOK_LOG: ${{ secrets.WEBHOOK_LOG }}
           WEBHOOK_ANUNCIOS: ${{ secrets.WEBHOOK_ANUNCIOS }}
           WEBHOOK_FORTNITE: ${{ secrets.WEBHOOK_FORTNITE }}
           WEBHOOK_RUST: ${{ secrets.WEBHOOK_RUST }}
@@ -34,6 +43,8 @@ jobs:
           WEBHOOK_RETRAC: ${{ secrets.WEBHOOK_RETRAC }}
           WEBHOOK_VALORANT: ${{ secrets.WEBHOOK_VALORANT }}
           WEBHOOK_R6: ${{ secrets.WEBHOOK_R6 }}
+          WEBHOOK_WARDOGS: ${{ secrets.WEBHOOK_WARDOGS }}
+          WEBHOOK_APEX: ${{ secrets.WEBHOOK_APEX }}
 
       - name: Save new state to state.json
         run: |

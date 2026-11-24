@@ -3,16 +3,16 @@
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-24%2F7-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
 ![Discord](https://img.shields.io/badge/Discord-Webhooks-5865F2?style=for-the-badge&logo=discord&logoColor=white)
-![Sources](https://img.shields.io/badge/Monitored_Sources-17-2ECC71?style=for-the-badge)
+![Sources](https://img.shields.io/badge/Monitored_Sources-19-2ECC71?style=for-the-badge)
 
-An automated, serverless offset tracker that monitors **17 endpoints across 3 offset providers** for 9 competitive games. Whenever a game updates and new offsets or dumps are published, the bot automatically extracts the `.hpp` or `.json` file and posts it directly to your **Discord** channels.
+An automated, serverless offset tracker that monitors **19 endpoints across 3 offset providers** for 11 competitive games. Whenever a game updates and new offsets or dumps are published, the bot automatically extracts the `.hpp` or `.json` file and posts it directly to your **Discord** channels.
 
 ---
 
 ## ⚙️ How It Works
 
 1. **Scheduled Trigger:** Every 15 minutes, an external cron trigger (`cron-job.org`) calls GitHub's `workflow_dispatch` API to start the workflow on time.
-2. **Multi-Source Scraping:** `check_offsets.py` queries the APIs of **CheatOffsets**, **Oshe Offsets**, and **Xerozify** across 17 game endpoints.
+2. **Multi-Source Scraping:** `check_offsets.py` queries the APIs of **CheatOffsets**, **KittyHook** (formerly Oshe Offsets), and **Xerozify** across 19 game endpoints.
 3. **Version & Build Comparison:** Each fetched build ID, version string, or file hash is compared against the last known version saved in `state.json`.
 4. **Instant Discord Delivery:**
    - **Game Channels:** If a new version is detected, the bot posts a rich embed pinging `@Offsets` with the ready-to-use `.hpp` (C++ header) or `.json` dump attached.
@@ -30,10 +30,11 @@ This tracker pulls live offset data from the following three public websites:
    - **Output:** Extracts `.json` offset maps or parses C++ `.hpp` code blocks from markdown.
    - **Tracked Games (5):** Fortnite, Rust, FiveM, CS2, Roblox.
 
-2. **[Oshe Offsets (`offsets.oshe.win`)](https://offsets.oshe.win)**
-   - **Endpoints:** `https://offsets.oshe.win/api/{game}/latest` & `https://offsets.oshe.win/games/{game}/{file}`
+2. **[KittyHook (`offsets.kittyhook.vip`)](https://offsets.kittyhook.vip)** — formerly `offsets.oshe.win`, same API.
+   - **Endpoints:** `https://offsets.kittyhook.vip/api/{game}/latest` & `https://offsets.kittyhook.vip/games/{game}/{file}`
    - **Output:** Downloads `offsets.hpp` / `Offsets.hpp` / `client_dll.hpp` directly (falls back to `offsets.json` if unavailable).
-   - **Tracked Games (8):** Fortnite, Rust, FiveM, CS2, Roblox, Rob Run, Retrac, Valorant.
+   - **Tracked Games (10):** Fortnite, Rust, FiveM, CS2, Roblox, Rob Run, Retrac, Valorant, Wardogs, Apex Legends.
+   - **Also available upstream (not tracked):** Blood Strike, Overwatch 2.
 
 3. **[Xerozify (`xerozify.xyz`)](https://xerozify.xyz)**
    - **Endpoint:** `https://xerozify.xyz/api/offsets/games/{game}/current`
@@ -42,18 +43,22 @@ This tracker pulls live offset data from the following three public websites:
 
 ### Coverage Matrix & Required Secrets
 
-| Game | CheatOffsets | Oshe Offsets | Xerozify | GitHub Secret Name |
+| Game | CheatOffsets | KittyHook | Xerozify | Default Webhook Secret |
 | :--- | :---: | :---: | :---: | :--- |
-| **Fortnite** | ✅ | ✅ | — | `WEBHOOK_FORTNITE` |
-| **Rust** | ✅ | ✅ | ✅ | `WEBHOOK_RUST` |
-| **FiveM** | ✅ | ✅ | ✅ | `WEBHOOK_FIVEM` |
-| **CS2** | ✅ | ✅ | — | `WEBHOOK_CS2` |
-| **Roblox** | ✅ | ✅ | — | `WEBHOOK_ROBLOX` |
-| **Valorant** | — | ✅ | ✅ | `WEBHOOK_VALORANT` |
-| **Rainbow Six Siege** | — | — | ✅ | `WEBHOOK_R6` |
-| **Rob Run** | — | ✅ | — | `WEBHOOK_ROBRUN` |
-| **Retrac** | — | ✅ | — | `WEBHOOK_RETRAC` |
-| **Scan Log / Status** | *All* | *All* | *All* | `WEBHOOK_ANUNCIOS` |
+| **Fortnite** | ✅ | ✅ | — | `WEBHOOK_OFFSETS` |
+| **Rust** | ✅ | ✅ | ✅ | `WEBHOOK_OFFSETS` |
+| **FiveM** | ✅ | ✅ | ✅ | `WEBHOOK_OFFSETS` |
+| **CS2** | ✅ | ✅ | — | `WEBHOOK_OFFSETS` |
+| **Roblox** | ✅ | ✅ | — | `WEBHOOK_OFFSETS` |
+| **Valorant** | — | ✅ | ✅ | `WEBHOOK_OFFSETS` |
+| **Rainbow Six Siege** | — | — | ✅ | `WEBHOOK_OFFSETS` |
+| **Rob Run** | — | ✅ | — | `WEBHOOK_OFFSETS` |
+| **Retrac** | — | ✅ | — | `WEBHOOK_OFFSETS` |
+| **Wardogs** | — | ✅ | — | `WEBHOOK_OFFSETS` |
+| **Apex Legends** | — | ✅ | — | `WEBHOOK_OFFSETS` |
+| **Scan Log / Status** | *All* | *All* | *All* | `WEBHOOK_LOG` |
+
+> Every game falls back to `WEBHOOK_OFFSETS`, so **two secrets are enough** to get started. If you ever want a specific game in its own channel, add that game's override secret (`WEBHOOK_FORTNITE`, `WEBHOOK_RUST`, `WEBHOOK_FIVEM`, `WEBHOOK_CS2`, `WEBHOOK_ROBLOX`, `WEBHOOK_ROBRUN`, `WEBHOOK_RETRAC`, `WEBHOOK_VALORANT`, `WEBHOOK_R6`, `WEBHOOK_WARDOGS`, `WEBHOOK_APEX`) and it wins over the default.
 
 ---
 
@@ -74,8 +79,14 @@ Follow these steps to deploy your own 24/7 instance completely free—no VPS or 
 Never paste webhook URLs directly into the code. Store them securely as encrypted secrets:
 1. In your forked GitHub repository, go to **Settings** → **Secrets and variables** → **Actions**.
 2. Click **New repository secret**.
-3. Create secrets using the exact names from the table above (`WEBHOOK_ANUNCIOS`, `WEBHOOK_FORTNITE`, `WEBHOOK_RUST`, etc.) and paste the corresponding Discord webhook URL as the value.
-   > **Tip:** If you don't want alerts for a specific game, simply skip creating its secret. The script will safely skip any game without a configured webhook.
+3. Create these two secrets and paste the matching Discord webhook URL as each value:
+
+   | Secret name | Value |
+   | :--- | :--- |
+   | `WEBHOOK_OFFSETS` | the webhook of the channel that should receive every game's offsets |
+   | `WEBHOOK_LOG` | the webhook of the scan log / status channel |
+
+   > **Tip:** Both are optional — the script prints `[config] ... MISSING` in the Actions log and simply skips anything without a webhook. To split games across channels later, add the per-game overrides from the table above.
 
 ### Step 4: Enable Workflow Write Permissions
 The bot needs permission to update `state.json` inside your repository whenever a new build is detected:
@@ -83,8 +94,10 @@ The bot needs permission to update `state.json` inside your repository whenever 
 2. Scroll down to **Workflow permissions**.
 3. Select **Read and write permissions** and click **Save**.
 
-### Step 5: Automate Runs Every 15 Minutes (`cron-job.org`)
-GitHub's built-in `schedule` trigger can suffer from long delays during peak hours. Using `workflow_dispatch` with a free external cron service guarantees punctual scans every 15 minutes:
+### Step 5: Automation (Built In)
+The workflow already schedules itself every 15 minutes (`schedule` → `cron: '*/15 * * * *'` in `.github/workflows/watcher.yaml`), so nothing else is needed to keep it running 24/7.
+
+GitHub can delay scheduled runs during peak hours. If you want exact timing, you can also trigger it externally through the `workflow_dispatch` API with a free `cron-job.org` account:
 1. **Create a GitHub Token:**
    - Go to your GitHub profile **Settings** (top-right avatar) → **Developer settings** → **Personal access tokens** → **Tokens (classic)** → **Generate new token (classic)**.
    - Give it a name (e.g., `offset-watcher`), set expiration to **No expiration**, check the **`workflow`** scope, and copy the generated token.
